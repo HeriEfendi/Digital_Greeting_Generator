@@ -7,18 +7,51 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.pnpm-store
+
+# Production & Build outputs
+dist/
+dist-ssr/
 *.local
 
-# Editor directories and files
+# Exported / downloaded testing archives
+*.zip
+generated-greeting*.zip
+
+# Environment & Local configurations
+.env
+.env.*
+!.env.example
+
+# Editor & IDE directories
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.swp
+*.swo
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Cache & Temporary files
+.cache/
+.temp/
+.tmp/
+.eslintcache
+.stylelintcache
