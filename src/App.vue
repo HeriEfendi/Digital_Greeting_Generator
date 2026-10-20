@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, watch } from 'vue'
 import Dexie from 'dexie'
-import { ArrowUp, Download } from 'lucide-vue-next'
+import { ArrowUp, ChevronDown, Download, FolderKanban } from 'lucide-vue-next'
 
 import { fonts, getDefaultBase, presets, themes, themeStylesMap } from './constants/presets'
 import { exportZipPackage, getGoogleCalendarUrl } from './services/exporter'
@@ -10,10 +10,17 @@ import Sidebar from './components/Sidebar.vue'
 import ModalEditor from './components/ModalEditor.vue'
 import PreviewCanvas from './components/PreviewCanvas.vue'
 import LightboxModal from './components/LightboxModal.vue'
+import ProjectManagerModal from './components/ProjectManagerModal.vue'
 
-// ===== Database & State =====
+// ===== Database & Multi-Draft State (STU-02) =====
 const db = new Dexie('GreetingGeneratorDB')
-db.version(2).stores({ projects: 'id' })
+db.version(3).stores({ projects: 'id, updatedAt, name' })
+
+const activeProjectId = ref(
+  (typeof window !== 'undefined' && localStorage.getItem('notecraft_active_project_id')) || 'primary_project'
+)
+const projectsList = ref([])
+const projectModalOpen = ref(false)
 
 const sections = reactive([
   ['hero', 'Cover & CTA'],
@@ -41,6 +48,11 @@ const qrisUrl = ref('')
 const musicPlaying = ref(false)
 const audioEl = ref(null)
 const showScrollTop = ref(false)
+
+const currentProjectName = computed(() => {
+  const p = projectsList.value.find(x => x.id === activeProjectId.value)
+  return p?.name || state.meta.title || 'Undangan Saya'
+})
 
 // Toast feedback
 const toastMessage = ref('')
@@ -285,6 +297,31 @@ function changePreset() {
   }
 }
 
+// Reset Section ke Default Preset (STU-04)
+function handleResetSection(sectionId) {
+  if (!sectionId) return
+  const currentPresetKey = state.meta.preset || 'invitation'
+  const presetSource = presets[currentPresetKey] || presets.invitation
+  const baseDefaults = getDefaultBase()
+
+  if (sectionId === 'general') {
+    const defaultMeta = presetSource.meta || baseDefaults.meta
+    Object.assign(state.meta, JSON.parse(JSON.stringify(defaultMeta)))
+    showToast('↺ Pengaturan Utama berhasil di-reset ke default preset!')
+    return
+  }
+
+  if (state.sections[sectionId]) {
+    const defaultSection = presetSource[sectionId] || baseDefaults.sections[sectionId]
+    if (defaultSection) {
+      const currentOn = state.sections[sectionId].on
+      Object.assign(state.sections[sectionId], JSON.parse(JSON.stringify(defaultSection)), { on: currentOn })
+      const label = sections.find(x => x[0] === sectionId)?.[1] || sectionId
+      showToast(`↺ Section "${label}" berhasil di-reset ke default preset!`)
+    }
+  }
+}
+
 function onThemeChange() {
   const t = state.meta.theme_id
   if (t === 'luxury_gold') {
@@ -403,22 +440,177 @@ async function handleExportZip() {
   }
 }
 
+// ===== Multi-Draft / Project Manager Methods (STU-02) =====
+async function loadProjectsList() {
+  const all = await db.projects.toArray()
+  if (!all.length) {
+    const initial = {
+      id: 'primary_project',
+      name: state.meta.title || 'Undangan Naya & Arga',
+      updatedAt: Date.now(),
+      ...JSON.parse(JSON.stringify(getDefaultBase()))
+    }
+    await db.projects.put(initial)
+    projectsList.value = [initial]
+    activeProjectId.value = 'primary_project'
+  } else {
+    projectsList.value = all.map(p => ({
+      id: p.id,
+      name: p.name || p.meta?.title || 'Undangan',
+      updatedAt: p.updatedAt || Date.now(),
+      state: p
+    })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+  }
+}
+
+async function saveCurrentProject() {
+  const raw = toRaw(state)
+  const clone = JSON.parse(JSON.stringify(raw, (k, v) => v instanceof File || v instanceof Blob ? undefined : v))
+  clone.id = activeProjectId.value
+  clone.name = state.meta.title || currentProjectName.value
+  clone.updatedAt = Date.now()
+  clone.music = { file_blob: raw.music.file_blob, file_name: raw.music.file_name }
+  clone.gallery = raw.gallery.map(g => ({ ...g }))
+  clone.meta.bg_image = raw.meta.bg_image
+  if (raw.sections.gift && raw.sections.gift.qris_image) {
+    clone.sections.gift.qris_image = raw.sections.gift.qris_image
+  }
+  await db.projects.put(clone)
+}
+
+async function switchProject(targetId) {
+  if (targetId === activeProjectId.value) {
+    projectModalOpen.value = false
+    return
+  }
+  ready.value = false
+  await saveCurrentProject()
+
+  const target = await db.projects.get(targetId)
+  if (target) {
+    activeProjectId.value = targetId
+    localStorage.setItem('notecraft_active_project_id', targetId)
+
+    // Clear current state and assign target
+    const targetData = target.state || target
+    Object.assign(state, getDefaultBase(), targetData)
+
+    resetUrls()
+    startCountdown()
+    ready.value = true
+    status.value = 'Tersimpan lokal'
+    projectModalOpen.value = false
+    await loadProjectsList()
+    showToast(`📂 Beralih ke: ${currentProjectName.value}`)
+  }
+}
+
+async function createProject({ preset, title }) {
+  const newId = `proj_${Date.now()}`
+  const newBase = getDefaultBase()
+  newBase.id = newId
+  newBase.meta.preset = preset
+  newBase.meta.title = title
+
+  if (presets[preset]) {
+    const p = presets[preset]
+    if (p.meta) Object.assign(newBase.meta, p.meta)
+    for (const [k, v] of Object.entries(p)) {
+      if (k !== 'title' && k !== 'meta' && newBase.sections[k]) {
+        Object.assign(newBase.sections[k], JSON.parse(JSON.stringify(v)))
+      }
+    }
+  }
+
+  const projRecord = {
+    id: newId,
+    name: title,
+    updatedAt: Date.now(),
+    ...newBase
+  }
+
+  await db.projects.put(projRecord)
+  await loadProjectsList()
+  await switchProject(newId)
+  showToast('✨ Proyek undangan baru berhasil dibuat!')
+}
+
+async function duplicateProject(targetId) {
+  const source = await db.projects.get(targetId)
+  if (!source) return
+
+  const newId = `proj_${Date.now()}`
+  const copyRecord = JSON.parse(JSON.stringify(source, (k, v) => v instanceof File || v instanceof Blob ? undefined : v))
+  copyRecord.id = newId
+  copyRecord.name = `[Salinan] ${source.name || source.meta?.title || 'Undangan'}`
+  if (copyRecord.meta) copyRecord.meta.title = copyRecord.name
+  copyRecord.updatedAt = Date.now()
+
+  // Copy blobs if source was active
+  if (targetId === activeProjectId.value) {
+    copyRecord.music = { file_blob: state.music.file_blob, file_name: state.music.file_name }
+    copyRecord.gallery = state.gallery.map(g => ({ ...g }))
+    copyRecord.meta.bg_image = state.meta.bg_image
+    if (state.sections.gift?.qris_image) {
+      copyRecord.sections.gift.qris_image = state.sections.gift.qris_image
+    }
+  } else if (source.music) {
+    copyRecord.music = source.music
+    copyRecord.gallery = source.gallery
+    copyRecord.meta.bg_image = source.meta?.bg_image
+  }
+
+  await db.projects.put(copyRecord)
+  await loadProjectsList()
+  showToast('📋 Proyek berhasil diduplikat!')
+}
+
+async function renameProject(targetId, newName) {
+  const p = await db.projects.get(targetId)
+  if (!p) return
+  p.name = newName
+  p.updatedAt = Date.now()
+  if (p.meta) p.meta.title = newName
+  await db.projects.put(p)
+
+  if (targetId === activeProjectId.value) {
+    state.meta.title = newName
+  }
+  await loadProjectsList()
+  showToast('✏️ Nama proyek diperbarui')
+}
+
+async function deleteProject(targetId) {
+  if (projectsList.value.length <= 1) {
+    showToast('⚠️ Tidak dapat menghapus, minimal harus ada 1 proyek tersisa')
+    return
+  }
+
+  await db.projects.delete(targetId)
+  await loadProjectsList()
+
+  if (activeProjectId.value === targetId) {
+    const nextProj = projectsList.value[0]
+    if (nextProj) {
+      await switchProject(nextProj.id)
+    }
+  }
+  showToast('🗑️ Proyek telah dihapus')
+}
+
 // ===== Auto-save =====
 watch(state, () => {
   if (ready.value) {
     clearTimeout(window.save)
     window.save = setTimeout(async () => {
-      const raw = toRaw(state)
-      const clone = JSON.parse(JSON.stringify(raw, (k, v) => v instanceof File || v instanceof Blob ? undefined : v))
-      // Re-attach blobs
-      clone.music = { file_blob: raw.music.file_blob, file_name: raw.music.file_name }
-      clone.gallery = raw.gallery.map(g => ({ ...g }))
-      clone.meta.bg_image = raw.meta.bg_image
-      if (raw.sections.gift && raw.sections.gift.qris_image) {
-        clone.sections.gift.qris_image = raw.sections.gift.qris_image
-      }
-      await db.projects.put(clone)
+      await saveCurrentProject()
       status.value = 'Tersimpan lokal'
+      // update project name in list if title changed
+      const currentInList = projectsList.value.find(p => p.id === activeProjectId.value)
+      if (currentInList && currentInList.name !== state.meta.title) {
+        currentInList.name = state.meta.title
+        currentInList.updatedAt = Date.now()
+      }
     }, 350)
   }
 }, { deep: true })
@@ -428,9 +620,12 @@ watch(() => state.sections.hero.title, v => { state.meta.title = v })
 
 // ===== Init & Migration =====
 onMounted(async () => {
-  const saved = await db.projects.get('primary_project')
+  await loadProjectsList()
+
+  const saved = await db.projects.get(activeProjectId.value) || await db.projects.get('primary_project')
   if (saved) {
-    Object.assign(state, saved)
+    activeProjectId.value = saved.id || 'primary_project'
+    Object.assign(state, saved.state || saved)
     if (!state.sections) Object.assign(state, getDefaultBase())
 
     const defaults = getDefaultBase().meta
@@ -490,7 +685,21 @@ onMounted(async () => {
   <audio ref="audioEl" :src="musicUrl" loop></audio>
 
   <header class="top">
-    <a href="#builder">NOTECRAFT</a>
+    <div style="display:flex;align-items:center;gap:.85rem">
+      <a href="#builder">NOTECRAFT</a>
+
+      <!-- Project Switcher Pill Button (STU-02) -->
+      <button
+        class="project-pill-btn"
+        title="Buka Pengelola Proyek & Draft Undangan"
+        @click="projectModalOpen = true"
+      >
+        <FolderKanban style="width:14px;height:14px;margin-right:6px;color:#a85270;flex-shrink:0" />
+        <span class="project-pill-name">{{ currentProjectName }}</span>
+        <ChevronDown style="width:13px;height:13px;margin-left:5px;opacity:.6;flex-shrink:0" />
+      </button>
+    </div>
+
     <span aria-live="polite">{{ status }}</span>
     <button class="primary" :disabled="exporting" @click="handleExportZip">
       <Download /> {{ exporting ? 'Merakit…' : 'Download ZIP' }}
@@ -506,7 +715,7 @@ onMounted(async () => {
       @move-section="move"
     />
 
-    <!-- Preview Canvas Component (DEV-02 & DEV-03) -->
+    <!-- Preview Canvas Component (DEV-02, DEV-03 & STU-01) -->
     <PreviewCanvas
       :state="state"
       :sections="sections"
@@ -531,7 +740,7 @@ onMounted(async () => {
     />
   </main>
 
-  <!-- Modal Editor Component (DEV-02) -->
+  <!-- Modal Editor Component (DEV-02, STU-03 & STU-04) -->
   <ModalEditor
     :open="open"
     :state="state"
@@ -559,8 +768,23 @@ onMounted(async () => {
     @remove-qris-image="removeQrisImage"
     @copy-link="copyToClipboard(generatedShareLink, 'Tautan tamu berhasil disalin!')"
     @send-share-wa="sendShareViaWa"
+    @reset-section="handleResetSection"
+    @show-toast="showToast"
     @update:share-guest-name="shareGuestName = $event"
     @update:share-wa-number="shareWaNumber = $event"
+  />
+
+  <!-- Multi-Draft Project Manager Modal (STU-02) -->
+  <ProjectManagerModal
+    :open="projectModalOpen"
+    :projects="projectsList"
+    :active-id="activeProjectId"
+    @close="projectModalOpen = false"
+    @select-project="switchProject"
+    @create-project="createProject"
+    @duplicate-project="duplicateProject"
+    @rename-project="renameProject"
+    @delete-project="deleteProject"
   />
 
   <!-- Lightbox Modal Component (DEV-02 & FTR-06) -->

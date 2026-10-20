@@ -9,9 +9,12 @@ import {
   MapPin,
   Maximize2,
   MessageSquare,
+  Monitor,
   QrCode,
   Send,
+  Smartphone,
   Sparkles,
+  Tablet,
   UserCheck
 } from 'lucide-vue-next'
 
@@ -40,6 +43,18 @@ const emit = defineEmits([
   'copy-account',
   'show-toast'
 ])
+
+// Device Viewport Switcher (STU-01)
+const viewportMode = ref('mobile')
+const viewportStyle = computed(() => {
+  if (viewportMode.value === 'mobile') {
+    return { width: '385px', maxWidth: '100%', transition: 'max-width .3s cubic-bezier(0.16, 1, 0.3, 1), width .3s ease' }
+  }
+  if (viewportMode.value === 'tablet') {
+    return { width: '720px', maxWidth: '100%', transition: 'max-width .3s cubic-bezier(0.16, 1, 0.3, 1), width .3s ease' }
+  }
+  return { width: '100%', maxWidth: '960px', transition: 'max-width .3s cubic-bezier(0.16, 1, 0.3, 1), width .3s ease' }
+})
 
 // Local RSVP form state in preview
 const rsvpForm = reactive({
@@ -276,12 +291,44 @@ watch(() => props.sections, () => {
 <template>
   <section class="canvas">
     <div class="canvas-bar">
-      <span>PREVIEW · {{ themes[state.meta.theme_id] }} · {{ state.meta.font_family }}</span>
+      <span>PREVIEW · {{ themes[state.meta.theme_id] }}</span>
       <span class="canvas-page-title" :title="'Judul halaman: ' + state.meta.title">{{ state.meta.title }}</span>
+
+      <!-- Viewport Device Switcher (STU-01) -->
+      <div class="viewport-switcher">
+        <button
+          type="button"
+          :class="['viewport-btn', { active: viewportMode === 'mobile' }]"
+          title="Tampilan HP / Mobile (375px)"
+          @click="viewportMode = 'mobile'"
+        >
+          <Smartphone style="width:13px;height:13px;vertical-align:-1px" />
+          <span class="viewport-btn-text">HP</span>
+        </button>
+        <button
+          type="button"
+          :class="['viewport-btn', { active: viewportMode === 'tablet' }]"
+          title="Tampilan Tablet (768px)"
+          @click="viewportMode = 'tablet'"
+        >
+          <Tablet style="width:13px;height:13px;vertical-align:-1px" />
+          <span class="viewport-btn-text">Tablet</span>
+        </button>
+        <button
+          type="button"
+          :class="['viewport-btn', { active: viewportMode === 'desktop' }]"
+          title="Tampilan Penuh / Desktop (960px)"
+          @click="viewportMode = 'desktop'"
+        >
+          <Monitor style="width:13px;height:13px;vertical-align:-1px" />
+          <span class="viewport-btn-text">Desktop</span>
+        </button>
+      </div>
+
       <button class="primary mobile" @click="$emit('export-zip')"><Download /> Export</button>
     </div>
 
-    <article :style="cardStyle" :class="['site', `theme-${state.meta.theme_id}`, { 'theme-dark': themeStyles.isDark }]">
+    <article :style="[cardStyle, viewportStyle]" :class="['site', `theme-${state.meta.theme_id}`, { 'theme-dark': themeStyles.isDark }, `viewport-${viewportMode}`]">
       <div class="site-bg" :style="bgStyle">
         <div class="site-bg-overlay" :style="bgOverlayStyle"></div>
       </div>

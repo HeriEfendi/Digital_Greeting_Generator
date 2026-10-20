@@ -1,12 +1,16 @@
 <script setup>
+import { ref } from 'vue'
 import {
+  Columns2,
   Copy,
+  CopyPlus,
   ImagePlus,
   Layers,
   Music2,
   Pause,
   Play,
   Plus,
+  RotateCcw,
   Settings2,
   Share2,
   Trash2,
@@ -44,29 +48,99 @@ const emit = defineEmits([
   'remove-qris-image',
   'copy-link',
   'send-share-wa',
+  'reset-section',
+  'show-toast',
   'update:shareGuestName',
   'update:shareWaNumber'
 ])
+
+// Live Preview Docked Mode (STU-03)
+const isDocked = ref(false)
+
+// Duplicate item helpers (STU-04)
+function duplicateStoryItem(index) {
+  const item = props.state.sections.story.items[index]
+  if (!item) return
+  props.state.sections.story.items.splice(index + 1, 0, {
+    year: item.year,
+    title: `${item.title} (Salinan)`,
+    desc: item.desc
+  })
+  emit('show-toast', '📋 Momen milestone berhasil diduplikat!')
+}
+
+function duplicateFaqItem(index) {
+  const item = props.state.sections.faq.items[index]
+  if (!item) return
+  props.state.sections.faq.items.splice(index + 1, 0, {
+    q: `${item.q} (Salinan)`,
+    a: item.a
+  })
+  emit('show-toast', '📋 Pertanyaan FAQ berhasil diduplikat!')
+}
+
+function duplicateWishItem(index) {
+  const item = props.state.sections.guestbook.items[index]
+  if (!item) return
+  props.state.sections.guestbook.items.splice(index + 1, 0, {
+    name: `${item.name} (Salinan)`,
+    message: item.message,
+    date: 'Baru saja'
+  })
+  emit('show-toast', '📋 Doa ucapan berhasil diduplikat!')
+}
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="modal-overlay" @click.self="$emit('close')">
-      <div class="modal-box">
+    <div
+      v-if="open"
+      :class="['modal-overlay', { 'modal-overlay-docked': isDocked }]"
+      @click.self="!isDocked && $emit('close')"
+    >
+      <div :class="['modal-box', { 'modal-box-docked': isDocked }]">
         <div class="modal-header">
-          <h2>
-            <Settings2 v-if="open === 'general'" style="width:18px;height:18px;color:#a85270" />
-            <Share2 v-else-if="open === 'share'" style="width:18px;height:18px;color:#0284c7" />
-            <Layers v-else style="width:18px;height:18px;color:#a85270" />
-            {{
-              open === 'general'
-                ? 'Pengaturan Utama & Tema'
-                : open === 'share'
-                  ? 'Bagikan & Link Tamu'
-                  : `Edit ${sections.find(x => x[0] === open)?.[1] || ''}`
-            }}
-          </h2>
-          <button class="modal-close" title="Tutup modal" @click="$emit('close')"><X /></button>
+          <div style="display:flex;align-items:center;gap:.55rem;min-width:0">
+            <Settings2 v-if="open === 'general'" style="width:18px;height:18px;color:#a85270;flex-shrink:0" />
+            <Share2 v-else-if="open === 'share'" style="width:18px;height:18px;color:#0284c7;flex-shrink:0" />
+            <Layers v-else style="width:18px;height:18px;color:#a85270;flex-shrink:0" />
+            <h2 class="modal-title-text">
+              {{
+                open === 'general'
+                  ? 'Pengaturan Utama'
+                  : open === 'share'
+                    ? 'Bagikan & Link Tamu'
+                    : `Edit ${sections.find(x => x[0] === open)?.[1] || ''}`
+              }}
+            </h2>
+          </div>
+
+          <div class="modal-header-actions">
+            <!-- Reset Section Button (STU-04) -->
+            <button
+              v-if="open !== 'share'"
+              type="button"
+              class="modal-action-pill"
+              title="Kembalikan section ini ke teks default preset"
+              @click="$emit('reset-section', open)"
+            >
+              <RotateCcw style="width:12px;height:12px;vertical-align:-1px;margin-right:3px" />
+              Reset
+            </button>
+
+            <!-- Docked Live Preview Switcher (STU-03) -->
+            <button
+              type="button"
+              :class="['modal-mode-btn', { active: isDocked }]"
+              :title="isDocked ? 'Beralih ke Mode Tengah (Fokus)' : 'Beralih ke Mode Samping (Live Preview)'"
+              @click="isDocked = !isDocked"
+            >
+              <Columns2 style="width:13px;height:13px;vertical-align:-1px;margin-right:3px" />
+              <span>{{ isDocked ? 'Tengah' : 'Live' }}</span>
+            </button>
+
+            <button class="modal-close" title="Tutup modal" @click="$emit('close')"><X /></button>
+          </div>
         </div>
 
         <div class="modal-body">
@@ -270,7 +344,7 @@ const emit = defineEmits([
             <label>Label</label><input v-model="state.sections.countdown.label">
           </template>
 
-          <!-- Story Section -->
+          <!-- Story Section (with STU-04 duplicate item) -->
           <template v-if="open === 'story'">
             <label>Judul Section</label><input v-model="state.sections.story.title">
 
@@ -289,13 +363,18 @@ const emit = defineEmits([
               <div v-for="(item, i) in state.sections.story.items" :key="i" class="timeline-editor-item">
                 <div class="timeline-editor-header">
                   <span class="timeline-step-badge">Momen {{ i + 1 }}</span>
-                  <button
-                    v-if="state.sections.story.items.length > 1"
-                    class="remove-bg"
-                    @click="state.sections.story.items.splice(i, 1)"
-                  >
-                    <Trash2 /> Hapus
-                  </button>
+                  <div style="display:flex;gap:.35rem">
+                    <button class="remove-bg" style="color:#0284c7" title="Duplikat momen ini (STU-04)" @click="duplicateStoryItem(i)">
+                      <CopyPlus style="width:13px;height:13px;vertical-align:-2px" /> Duplikat
+                    </button>
+                    <button
+                      v-if="state.sections.story.items.length > 1"
+                      class="remove-bg"
+                      @click="state.sections.story.items.splice(i, 1)"
+                    >
+                      <Trash2 /> Hapus
+                    </button>
+                  </div>
                 </div>
                 <div class="timeline-row">
                   <div>
@@ -349,7 +428,7 @@ const emit = defineEmits([
             </div>
           </template>
 
-          <!-- Guestbook Section (FTR-07) -->
+          <!-- Guestbook Section (FTR-07 with STU-04 duplicate item) -->
           <template v-if="open === 'guestbook'">
             <label>Judul Section</label><input v-model="state.sections.guestbook.title">
             <label>Catatan / Subjudul</label><textarea v-model="state.sections.guestbook.note" rows="2"></textarea>
@@ -358,7 +437,12 @@ const emit = defineEmits([
               <div v-for="(w, i) in (state.sections.guestbook.items || [])" :key="i" class="timeline-editor-item" style="padding:.75rem">
                 <div class="timeline-editor-header">
                   <strong>{{ w.name }}</strong>
-                  <button class="remove-bg" @click="state.sections.guestbook.items.splice(i, 1)"><Trash2 /> Hapus</button>
+                  <div style="display:flex;gap:.35rem">
+                    <button class="remove-bg" style="color:#0284c7" title="Duplikat ucapan ini (STU-04)" @click="duplicateWishItem(i)">
+                      <CopyPlus style="width:13px;height:13px;vertical-align:-2px" /> Duplikat
+                    </button>
+                    <button class="remove-bg" @click="state.sections.guestbook.items.splice(i, 1)"><Trash2 /> Hapus</button>
+                  </div>
                 </div>
                 <p style="margin:.25rem 0;font-size:.88rem;color:#475569">{{ w.message }}</p>
                 <small style="color:#94a3b8;font-size:.75rem">{{ w.date }}</small>
@@ -389,7 +473,7 @@ const emit = defineEmits([
             </div>
           </template>
 
-          <!-- FAQ Section -->
+          <!-- FAQ Section (with STU-04 duplicate item) -->
           <template v-if="open === 'faq'">
             <label>Judul</label><input v-model="state.sections.faq.title">
             <label>Dress code</label><input v-model="state.sections.faq.dress">
@@ -398,13 +482,18 @@ const emit = defineEmits([
               <input v-model="item.q">
               <label>Jawaban</label>
               <textarea v-model="item.a" rows="2"></textarea>
-              <button
-                v-if="state.sections.faq.items.length > 1"
-                class="remove-bg"
-                @click="state.sections.faq.items.splice(i, 1)"
-              >
-                <Trash2 /> Hapus
-              </button>
+              <div style="display:flex;gap:.35rem;margin-top:.5rem">
+                <button class="remove-bg" style="color:#0284c7" title="Duplikat pertanyaan ini (STU-04)" @click="duplicateFaqItem(i)">
+                  <CopyPlus style="width:13px;height:13px;vertical-align:-2px" /> Duplikat
+                </button>
+                <button
+                  v-if="state.sections.faq.items.length > 1"
+                  class="remove-bg"
+                  @click="state.sections.faq.items.splice(i, 1)"
+                >
+                  <Trash2 /> Hapus
+                </button>
+              </div>
             </div>
             <button class="add-btn" @click="state.sections.faq.items.push({ q: '', a: '' })">
               <Plus /> Tambah pertanyaan
@@ -426,3 +515,86 @@ const emit = defineEmits([
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.modal-title-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #2e2026;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.modal-action-pill {
+  background: #fdf2f4;
+  color: #a85270;
+  border: 1px solid #ebdbe0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.15s ease;
+}
+
+.modal-action-pill:hover {
+  background: #fbe5ea;
+  border-color: #d8b8c2;
+}
+
+.modal-mode-btn {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: all 0.15s ease;
+}
+
+.modal-mode-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.modal-mode-btn.active {
+  background: #e0f2fe;
+  color: #0284c7;
+  border-color: #bae6fd;
+}
+
+/* Docked Live Preview Mode (STU-03) */
+.modal-overlay-docked {
+  background: rgba(15, 23, 42, 0.05) !important;
+  pointer-events: none !important;
+  justify-content: flex-end !important;
+  padding: 1.25rem 1.75rem !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.modal-box-docked {
+  pointer-events: auto !important;
+  width: 480px !important;
+  max-width: 90vw !important;
+  height: 94vh !important;
+  max-height: 94vh !important;
+  margin: 0 !important;
+  box-shadow: -12px 0 35px rgba(0, 0, 0, 0.16) !important;
+}
+</style>

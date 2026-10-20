@@ -35,10 +35,10 @@ Dokumen ini memuat seluruh rekomendasi fitur tambahan, variasi tampilan, dan pen
 
 | Status | ID | Fitur | Deskripsi & Manfaat | Estimasi Dampak |
 | :---: | :---: | :--- | :--- | :---: |
-| - [ ] | **STU-01** | **Device Viewport Switcher (Mobile/Tablet/Desktop)** | Tombol di atas preview untuk beralih mode tampilan: Layar HP (375px/iPhone), Tablet (768px), dan Layar Penuh (Desktop). | ⭐⭐⭐⭐⭐ |
-| - [ ] | **STU-02** | **Multi-Draft / Project Manager (Dexie)** | Pengguna bisa menyimpan banyak undangan/kartu ucapan berbeda di browser, mengganti nama draft, membuat baru, atau menghapus draft. | ⭐⭐⭐⭐ |
-| - [ ] | **STU-03** | **Live Preview Tanpa Menutup Modal** | Opsi preview langsung saat mengetik di modal tanpa harus klik "Selesai" untuk melihat perubahan. | ⭐⭐⭐ |
-| - [ ] | **STU-04** | **Fitur Reset / Duplikat Section** | Tombol cepat untuk mengembalikan isi section ke teks default preset atau menduplikasi elemen. | ⭐⭐⭐ |
+| - [x] | **STU-01** | **Device Viewport Switcher (Mobile/Tablet/Desktop)** | Tombol di atas preview untuk beralih mode tampilan: Layar HP (375px/iPhone), Tablet (768px), dan Layar Penuh (Desktop). | ⭐⭐⭐⭐⭐ |
+| - [x] | **STU-02** | **Multi-Draft / Project Manager (Dexie)** | Pengguna bisa menyimpan banyak undangan/kartu ucapan berbeda di browser, mengganti nama draft, membuat baru, atau menghapus draft. | ⭐⭐⭐⭐ |
+| - [x] | **STU-03** | **Live Preview Tanpa Menutup Modal** | Opsi preview langsung saat mengetik di modal tanpa harus klik "Selesai" untuk melihat perubahan. | ⭐⭐⭐ |
+| - [x] | **STU-04** | **Fitur Reset / Duplikat Section** | Tombol cepat untuk mengembalikan isi section ke teks default preset atau menduplikasi elemen. | ⭐⭐⭐ |
 
 ---
 

@@ -398,16 +398,18 @@ input[type=range] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 760px;
-  margin: 0 auto 1rem;
+  max-width: 960px;
+  margin: 0 auto 1.25rem;
   font-size: .7rem;
   font-weight: 700;
   letter-spacing: .13em;
   color: #9d6577;
+  gap: .75rem;
+  flex-wrap: wrap;
 }
 
 .canvas-page-title {
-  max-width: 220px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -416,6 +418,77 @@ input[type=range] {
   letter-spacing: .04em;
   font-weight: 400;
   font-size: .7rem;
+}
+
+/* ===== Viewport Switcher (STU-01) ===== */
+.viewport-switcher {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid #ebdbe0;
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.viewport-btn {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #645058;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.viewport-btn:hover {
+  color: var(--accent, #a85270);
+}
+
+.viewport-btn.active {
+  background: var(--accent, #a85270);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(168, 82, 112, 0.3);
+}
+
+/* ===== Project Pill Button (STU-02) ===== */
+.project-pill-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ebdbe0;
+  color: #443037;
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  max-width: 280px;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.project-pill-btn:hover {
+  background: #ffffff;
+  border-color: #a85270;
+  color: #a85270;
+  transform: translateY(-1px);
+}
+
+.project-pill-name {
+  max-width: 170px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
 }
 
 .mobile {
